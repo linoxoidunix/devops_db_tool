@@ -6,6 +6,7 @@ class QLineEdit;
 class QSpinBox;
 class QTextEdit;
 class QPushButton;
+class QLabel;
 
 class SchemaBackupDialog : public QWidget {
     Q_OBJECT
@@ -13,6 +14,7 @@ public:
     explicit SchemaBackupDialog(QWidget* parent = nullptr);
 
 private slots:
+    void onTestConnection();
     void onBrowseOutDir();
     void onExportBoth();
     void onBrowseScript1();
@@ -28,12 +30,14 @@ private:
     bool applyScript(const QString& filepath, const ConnectionConfig& cfg);
 
     // Connection
-    QLineEdit* m_host     = nullptr;
-    QSpinBox*  m_port     = nullptr;
-    QLineEdit* m_database = nullptr;
-    QLineEdit* m_user     = nullptr;
-    QLineEdit* m_password = nullptr;
-    QLineEdit* m_schema   = nullptr;
+    QLineEdit*   m_host            = nullptr;
+    QSpinBox*    m_port            = nullptr;
+    QLineEdit*   m_database        = nullptr;
+    QLineEdit*   m_user            = nullptr;
+    QLineEdit*   m_password        = nullptr;
+    QLineEdit*   m_schema          = nullptr;
+    QPushButton* m_testConnBtn     = nullptr;
+    QLabel*      m_connStatusLabel = nullptr;
 
     // Export
     QLineEdit*   m_outDir      = nullptr;

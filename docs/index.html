@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DevOps DB Tool — Руководство пользователя</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --accent:   #0078d4;
+      --accent-l: #e8f3fc;
+      --good:     #1a7f37;
+      --good-bg:  #d4f0dc;
+      --warn:     #9a6700;
+      --warn-bg:  #fff3cd;
+      --bad:      #b91c1c;
+      --bad-bg:   #fde8e8;
+      --text:     #1a1a1a;
+      --muted:    #555;
+      --border:   #d0d7de;
+      --bg:       #f6f8fa;
+      --sidebar-w: 240px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--text);
+      background: #fff;
+    }
+
+    /* ── Layout ─────────────────────────────────────────────────────────────── */
+    .layout { display: flex; min-height: 100vh; }
+
+    /* ── Sidebar ────────────────────────────────────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      background: var(--bg);
+      border-right: 1px solid var(--border);
+      padding: 24px 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+    }
+
+    .sidebar-logo {
+      padding: 0 20px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .sidebar-logo strong { display: block; font-size: 15px; color: var(--accent); }
+    .sidebar-logo span   { font-size: 12px; color: var(--muted); }
+
+    .sidebar nav a {
+      display: block;
+      padding: 6px 20px;
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 13.5px;
+      border-left: 3px solid transparent;
+      transition: background .15s, color .15s;
+    }
+    .sidebar nav a:hover  { background: #eaf2fb; color: var(--accent); }
+    .sidebar nav a.active { border-left-color: var(--accent); color: var(--accent); background: var(--accent-l); font-weight: 600; }
+    .sidebar nav .section-title {
+      display: block;
+      padding: 14px 20px 4px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #999;
+    }
+
+    /* ── Main content ───────────────────────────────────────────────────────── */
+    .content {
+      flex: 1;
+      max-width: 860px;
+      padding: 48px 56px;
+    }
+
+    h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+    h2 {
+      font-size: 20px; font-weight: 700; margin: 48px 0 12px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+      scroll-margin-top: 24px;
+    }
+    h3 { font-size: 16px; font-weight: 600; margin: 24px 0 8px; }
+    h4 { font-size: 14px; font-weight: 600; margin: 16px 0 6px; color: var(--muted); }
+
+    p  { margin-bottom: 12px; }
+    ul, ol { margin: 8px 0 12px 24px; }
+    li { margin-bottom: 4px; }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    code {
+      font-family: "Consolas", "SF Mono", monospace;
+      font-size: 13px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+    pre {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      border-radius: 8px;
+      padding: 18px 20px;
+      overflow-x: auto;
+      margin: 12px 0 20px;
+      font-family: "Consolas", "SF Mono", monospace;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+
+    /* ── Callouts ───────────────────────────────────────────────────────────── */
+    .callout {
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin: 16px 0;
+      font-size: 14px;
+    }
+    .callout-tip  { background: #f0fdf4; border-left: 4px solid #22c55e; }
+    .callout-warn { background: var(--warn-bg); border-left: 4px solid #f59e0b; }
+    .callout-info { background: var(--accent-l); border-left: 4px solid var(--accent); }
+    .callout strong { display: block; margin-bottom: 4px; }
+
+    /* ── Steps ──────────────────────────────────────────────────────────────── */
+    .steps { counter-reset: step; list-style: none; margin: 12px 0; padding: 0; }
+    .steps li {
+      counter-increment: step;
+      display: flex;
+      gap: 14px;
+      margin-bottom: 16px;
+      align-items: flex-start;
+    }
+    .steps li::before {
+      content: counter(step);
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+    }
+    .steps li > div { padding-top: 4px; }
+
+    /* ── Health badges ──────────────────────────────────────────────────────── */
+    .badges { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      border-radius: 20px; padding: 4px 14px; font-size: 13px; font-weight: 600;
+    }
+    .badge-good { background: var(--good-bg); color: var(--good); }
+    .badge-warn { background: var(--warn-bg); color: var(--warn); }
+    .badge-bad  { background: var(--bad-bg);  color: var(--bad);  }
+
+    /* ── UI mockup ──────────────────────────────────────────────────────────── */
+    .mockup {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 16px 0 24px;
+      font-family: monospace;
+      font-size: 12.5px;
+      line-height: 1.5;
+      white-space: pre;
+      overflow-x: auto;
+    }
+
+    /* ── Field table ────────────────────────────────────────────────────────── */
+    .field-table { width: 100%; border-collapse: collapse; margin: 12px 0 20px; font-size: 14px; }
+    .field-table th {
+      background: var(--bg); text-align: left;
+      padding: 8px 12px; border-bottom: 2px solid var(--border);
+      font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted);
+    }
+    .field-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .field-table tr:last-child td { border-bottom: none; }
+    .required { color: var(--bad); font-weight: 700; }
+    .optional { color: var(--muted); }
+
+    /* ── Intro card ─────────────────────────────────────────────────────────── */
+    .intro-card {
+      background: linear-gradient(135deg, #0078d4 0%, #1a3a5c 100%);
+      border-radius: 10px;
+      padding: 32px 36px;
+      color: #fff;
+      margin-bottom: 36px;
+    }
+    .intro-card h1 { color: #fff; margin-bottom: 4px; }
+    .intro-card p  { color: rgba(255,255,255,.85); margin-bottom: 0; font-size: 15px; }
+    .version-chip {
+      display: inline-block;
+      background: rgba(255,255,255,.2);
+      border-radius: 20px;
+      padding: 2px 12px;
+      font-size: 12px;
+      margin-bottom: 12px;
+    }
+
+    /* ── TOC ────────────────────────────────────────────────────────────────── */
+    .toc {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin: 24px 0 40px;
+    }
+    .toc h3 { margin-top: 0; margin-bottom: 10px; font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+    .toc ol { margin: 0; padding-left: 20px; }
+    .toc li { margin-bottom: 4px; font-size: 14px; }
+
+    hr.section-sep { border: none; border-top: 2px solid var(--border); margin: 56px 0; }
+  </style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ── Sidebar ────────────────────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <strong>DevOps DB Tool</strong>
+      <span>Руководство пользователя</span>
+    </div>
+    <nav>
+      <a href="#intro"  class="active">Введение</a>
+      <a href="#prereq">Требования</a>
+      <a href="#launch">Запуск</a>
+      <a href="#ui">Интерфейс</a>
+
+      <span class="section-title">Разделы</span>
+      <a href="#export">Описание схемы</a>
+      <a href="#backup">Бэкап / Восстановление</a>
+      <a href="#analysis">Анализ комментариев</a>
+      <a href="#about">О программе</a>
+
+      <span class="section-title">Справка</span>
+      <a href="#faq">Частые вопросы</a>
+      <a href="#contact">Обратная связь</a>
+    </nav>
+  </aside>
+
+  <!-- ── Content ────────────────────────────────────────────────────────────── -->
+  <main class="content">
+
+    <!-- Intro card -->
+    <div class="intro-card" id="intro">
+      <div class="version-chip">v 0.1.0</div>
+      <h1>DevOps DB Tool</h1>
+      <p>Инструмент для работы со схемами PostgreSQL: экспорт RTF-документации,
+         резервное копирование DDL и анализ качества комментариев к объектам базы данных.</p>
+    </div>
+
+    <!-- TOC -->
+    <div class="toc">
+      <h3>Содержание</h3>
+      <ol>
+        <li><a href="#prereq">Требования к системе</a></li>
+        <li><a href="#launch">Запуск программы</a></li>
+        <li><a href="#ui">Общий интерфейс</a></li>
+        <li><a href="#export">Раздел «Описание схемы»</a></li>
+        <li><a href="#backup">Раздел «Бэкап / Восстановление»</a></li>
+        <li><a href="#analysis">Раздел «Анализ комментариев»</a></li>
+        <li><a href="#faq">Частые вопросы</a></li>
+        <li><a href="#contact">Обратная связь</a></li>
+      </ol>
+    </div>
+
+    <!-- ── Требования ────────────────────────────────────────────────────────── -->
+    <h2 id="prereq">Требования к системе</h2>
+
+    <h3>Операционная система</h3>
+    <ul>
+      <li>Linux (рекомендуется), macOS или Windows</li>
+      <li>Qt 5.15 или новее (входит в состав исполняемого файла либо устанавливается отдельно)</li>
+    </ul>
+
+    <h3>PostgreSQL-клиент</h3>
+    <p>Для разделов <strong>«Описание схемы»</strong> и <strong>«Бэкап / Восстановление»</strong>
+       на машине должны быть установлены клиентские утилиты PostgreSQL:</p>
+
+    <pre><code># Debian / Ubuntu
+sudo apt install postgresql-client
+
+# Fedora / RHEL
+sudo dnf install postgresql</code></pre>
+
+    <p>Убедитесь, что <code>psql</code> и <code>pg_dump</code> доступны в <code>PATH</code>:</p>
+    <pre><code>psql --version
+pg_dump --version</code></pre>
+
+    <h3>Доступ к базе данных</h3>
+    <ul>
+      <li>Пользователь должен иметь права <code>CONNECT</code> на целевую базу данных.</li>
+      <li>Для просмотра таблиц и комментариев достаточно роли <code>pg_read_all_data</code> или явных <code>SELECT</code>-привилегий.</li>
+      <li>Для создания резервных копий через <code>pg_dump</code> нужна роль <code>pg_dump</code>-совместимого пользователя (обычно <code>postgres</code> или суперпользователь).</li>
+    </ul>
+
+    <hr class="section-sep" />
+
+    <!-- ── Запуск ─────────────────────────────────────────────────────────────── -->
+    <h2 id="launch">Запуск программы</h2>
+
+    <pre><code>./devops_db_tool</code></pre>
+
+    <p>При первом запуске поля подключения заполнены значениями по умолчанию
+       (<code>127.0.0.1:5432</code>, пользователь <code>postgres</code>).
+       Настройки автоматически сохраняются и восстанавливаются при следующем запуске.</p>
+
+    <hr class="section-sep" />
+
+    <!-- ── Интерфейс ──────────────────────────────────────────────────────────── -->
+    <h2 id="ui">Общий интерфейс</h2>
+
+    <p>Окно программы разделено на две зоны:</p>
+
+    <div class="mockup">┌──────────────────────────────────────────────────────────────┐
+│  ┌──────────────────┐  │                                      │
+│  │ 🔍 Поиск…        │  │                                      │
+│  ├──────────────────┤  │   Контент выбранного раздела         │
+│  │ Описание схемы   │  │                                      │
+│  │ Бэкап / Восст.   │  │                                      │
+│  │ Анализ коммент.  │  │                                      │
+│  │ О программе      │  │                                      │
+│  └──────────────────┘  │                                      │
+└──────────────────────────────────────────────────────────────┘</div>
+
+    <ul>
+      <li><strong>Левая панель</strong> — список разделов с полем поиска.
+          Введите несколько букв, чтобы быстро отфильтровать нужный пункт.</li>
+      <li><strong>Правая область</strong> — содержимое выбранного раздела.</li>
+    </ul>
+
+    <h3>Поле поиска по разделам</h3>
+    <p>Фильтрация происходит в реальном времени. Если текущий раздел скрывается фильтром,
+       автоматически выбирается первый подходящий.</p>
+
+    <h3>Кнопка «Проверить соединение»</h3>
+    <p>Во всех разделах с подключением к БД есть кнопка проверки. Нажмите её, чтобы убедиться
+       в корректности параметров <em>до</em> запуска основной операции.
+       Результат отображается рядом с кнопкой:</p>
+    <div class="badges">
+      <span class="badge badge-good">✔ Соединение успешно</span>
+      <span class="badge badge-bad">✗ Текст ошибки</span>
+    </div>
+
+    <hr class="section-sep" />
+
+    <!-- ── Описание схемы ─────────────────────────────────────────────────────── -->
+    <h2 id="export">Раздел «Описание схемы»</h2>
+
+    <p>Генерирует RTF-документ с описанием всех таблиц и колонок указанной схемы PostgreSQL.
+       В документ включаются: название таблицы, её комментарий, для каждой колонки —
+       название, тип данных, комментарий и, опционально, внешний ключ.</p>
+
+    <h3>Параметры подключения</h3>
+    <table class="field-table">
+      <thead><tr><th>Поле</th><th>Описание</th><th>По умолчанию</th></tr></thead>
+      <tbody>
+        <tr><td>Host</td><td>Адрес сервера PostgreSQL</td><td><code>127.0.0.1</code></td></tr>
+        <tr><td>Порт</td><td>Порт сервера</td><td><code>5432</code></td></tr>
+        <tr><td>База данных <span class="required">*</span></td><td>Имя базы данных</td><td>—</td></tr>
+        <tr><td>Пользователь</td><td>Имя пользователя</td><td><code>postgres</code></td></tr>
+        <tr><td>Пароль</td><td>Пароль пользователя</td><td>—</td></tr>
+        <tr><td>Схема <span class="required">*</span></td><td>Имя схемы для экспорта</td><td><code>public</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>Пошаговая инструкция</h3>
+    <ol class="steps">
+      <li><div>Заполните параметры подключения и нажмите <strong>«Проверить соединение»</strong>.</div></li>
+      <li><div>Введите имя схемы (например, <code>public</code> или <code>myschema</code>).</div></li>
+      <li><div>Укажите <strong>директорию вывода</strong> — папку, куда будет сохранён RTF-файл.
+               Используйте кнопку <strong>«Обзор…»</strong> для выбора через диалог.</div></li>
+      <li><div>При необходимости включите опцию <strong>«Включить описание Foreign Key»</strong>.</div></li>
+      <li><div>Нажмите <strong>«Сгенерировать описание схемы (RTF)»</strong>.</div></li>
+      <li><div>По окончании в поле <em>«Последний сгенерированный файл»</em> появится путь к RTF.
+               Кнопка <strong>«Скопировать путь»</strong> скопирует его в буфер обмена.</div></li>
+    </ol>
+
+    <h3>Имя файла</h3>
+    <p>Файл сохраняется в выбранной директории с именем вида:</p>
+    <pre><code>schema_&lt;имя_схемы&gt;_description_&lt;YYYYMMDD_HHmmss&gt;.rtf</code></pre>
+
+    <h3>Структура RTF-документа</h3>
+    <ul>
+      <li>Заголовок схемы и её комментарий</li>
+      <li>Для каждой таблицы: заголовок, комментарий, таблица колонок</li>
+      <li>Колонки таблицы: <em>Наименование поля / Описание (рус.) / Тип данных</em>
+          и опционально <em>Foreign Key</em></li>
+    </ul>
+
+    <div class="callout callout-tip">
+      <strong>Совет</strong>
+      Лог в нижней части экрана показывает прогресс обработки каждой таблицы.
+      Если таблица обрабатывается долго — возможно, схема содержит большой объём данных в системных каталогах.
+    </div>
+
+    <hr class="section-sep" />
+
+    <!-- ── Бэкап ──────────────────────────────────────────────────────────────── -->
+    <h2 id="backup">Раздел «Бэкап / Восстановление»</h2>
+
+    <p>Создаёт резервную копию DDL-структуры схемы в виде двух SQL-скриптов,
+       а также позволяет применить эти скрипты к базе данных для восстановления.</p>
+
+    <h3>Параметры подключения</h3>
+    <p>Аналогичны разделу «Описание схемы» (host, порт, база данных, пользователь, пароль, схема).</p>
+
+    <h3>Экспорт (создание резервной копии)</h3>
+
+    <div class="callout callout-info">
+      <strong>Почему два скрипта?</strong>
+      При восстановлении схемы в пустую базу данных внешние ключи (FOREIGN KEY) могут мешать созданию таблиц,
+      если целевая таблица ещё не существует. Разделение на два скрипта позволяет сначала создать все таблицы,
+      а затем добавить FK-ограничения.
+    </div>
+
+    <ol class="steps">
+      <li><div>Заполните параметры подключения, нажмите <strong>«Проверить соединение»</strong>.</div></li>
+      <li><div>Укажите <strong>директорию вывода</strong> через кнопку <strong>«Обзор…»</strong>.</div></li>
+      <li><div>Нажмите <strong>«Экспортировать (создать 2 скрипта)»</strong>.</div></li>
+      <li><div>После завершения в лог будут выведены пути к двум файлам,
+               а поля «Шаг 1» и «Шаг 2» заполнятся автоматически.</div></li>
+    </ol>
+
+    <h4>Имена создаваемых файлов</h4>
+    <pre><code>schema_&lt;схема&gt;_nodeps_&lt;YYYYMMDD_HHmmss&gt;.sql   ← Скрипт 1: таблицы без FK
+schema_&lt;схема&gt;_fk_only_&lt;YYYYMMDD_HHmmss&gt;.sql   ← Скрипт 2: только FK</code></pre>
+
+    <h3>Восстановление (импорт скриптов)</h3>
+
+    <div class="callout callout-warn">
+      <strong>Важно: порядок применения</strong>
+      Сначала всегда применяйте <strong>Скрипт 1</strong> (структура без FK),
+      и только после его успешного завершения — <strong>Скрипт 2</strong> (FK-ограничения).
+    </div>
+
+    <ol class="steps">
+      <li><div>Убедитесь, что параметры подключения указывают на <em>целевую</em> базу данных.</div></li>
+      <li><div>В блоке <strong>«Шаг 1 — схема без FK»</strong> выберите файл <code>…_nodeps_….sql</code>
+               через <strong>«Обзор…»</strong> или введите путь вручную.</div></li>
+      <li><div>Нажмите <strong>«Применить к БД»</strong> рядом со скриптом 1 и дождитесь сообщения об успехе.</div></li>
+      <li><div>В блоке <strong>«Шаг 2 — только FK»</strong> аналогично выберите файл <code>…_fk_only_….sql</code>
+               и нажмите <strong>«Применить к БД»</strong>.</div></li>
+    </ol>
+
+    <p>Статус каждой операции и вывод <code>psql</code> отображаются в <strong>лог-панели</strong> внизу.</p>
+
+    <hr class="section-sep" />
+
+    <!-- ── Анализ комментариев ─────────────────────────────────────────────────── -->
+    <h2 id="analysis">Раздел «Анализ комментариев»</h2>
+
+    <p>Сканирует <strong>все пользовательские схемы</strong> базы данных и оценивает качество комментариев
+       к таблицам и колонкам. Помогает выявить объекты без описания и комментарии с латиницей
+       там, где ожидается только кириллица.</p>
+
+    <h3>Параметры подключения</h3>
+    <table class="field-table">
+      <thead><tr><th>Поле</th><th>Описание</th><th>По умолчанию</th></tr></thead>
+      <tbody>
+        <tr><td>Host</td><td>Адрес сервера PostgreSQL</td><td><code>127.0.0.1</code></td></tr>
+        <tr><td>Порт</td><td>Порт сервера</td><td><code>5432</code></td></tr>
+        <tr><td>База данных <span class="required">*</span></td><td>Имя базы данных</td><td>—</td></tr>
+        <tr><td>Пользователь</td><td>Имя пользователя</td><td><code>postgres</code></td></tr>
+        <tr><td>Пароль</td><td>Пароль пользователя</td><td>—</td></tr>
+      </tbody>
+    </table>
+
+    <p class="callout callout-info">
+      <strong>Схема не указывается</strong> — программа автоматически находит и анализирует
+      все схемы базы данных (кроме системных: <code>pg_catalog</code>, <code>information_schema</code>).
+    </p>
+
+    <h3>Пошаговая инструкция</h3>
+    <ol class="steps">
+      <li><div>Заполните параметры подключения и нажмите <strong>«Проверить соединение»</strong>.</div></li>
+      <li><div>Нажмите <strong>«Анализировать»</strong>. Программа последовательно обходит все схемы — ход анализа виден в строке статистики.</div></li>
+      <li><div>После завершения левая панель заполнится списком схем с цветовой индикацией.</div></li>
+      <li><div>Кликните на любую схему — справа появится подробная статистика и список проблемных объектов.</div></li>
+    </ol>
+
+    <h3>Цветовая индикация схем</h3>
+    <div class="badges">
+      <span class="badge badge-good">✓ Нет проблем</span>
+      <span class="badge badge-warn">⚠ Есть замечания</span>
+      <span class="badge badge-bad">✗ Серьёзные проблемы</span>
+    </div>
+    <table class="field-table" style="margin-top:12px">
+      <thead><tr><th>Цвет</th><th>Условие</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge badge-good" style="font-size:12px">✓ Зелёный</span></td>
+            <td>Все таблицы и колонки имеют комментарии, латиница отсутствует.</td></tr>
+        <tr><td><span class="badge badge-warn" style="font-size:12px">⚠ Жёлтый</span></td>
+            <td>Покрытие комментариями ≥ 80 % для таблиц и колонок, но есть отдельные замечания.</td></tr>
+        <tr><td><span class="badge badge-bad" style="font-size:12px">✗ Красный</span></td>
+            <td>Покрытие комментариями &lt; 80 % хотя бы для таблиц или колонок.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Панель статистики</h3>
+    <p>При выборе схемы в правой части отображается:</p>
+    <ul>
+      <li>Комментарий к самой схеме (есть / пустой)</li>
+      <li>По таблицам: всего / с комментарием / только кириллица / есть латиница / без комментария</li>
+      <li>По колонкам: аналогичные показатели</li>
+    </ul>
+
+    <h3>Фильтр проблемных объектов</h3>
+    <p>Выпадающий список позволяет переключаться между категориями проблем (в скобках — количество):</p>
+    <ul>
+      <li><strong>Таблицы без комментария</strong> — таблицы, у которых комментарий не заполнен.</li>
+      <li><strong>Таблицы с латинскими буквами</strong> — комментарии содержат латиницу.</li>
+      <li><strong>Колонки без комментария</strong> — колонки без описания.</li>
+      <li><strong>Колонки с латинскими буквами</strong> — комментарии к колонкам содержат латиницу.</li>
+    </ul>
+
+    <div class="callout callout-tip">
+      <strong>Автовыбор</strong>
+      После анализа автоматически выделяется первая «красная» схема, чтобы сразу показать наиболее проблемное место.
+    </div>
+
+    <hr class="section-sep" />
+
+    <!-- ── О программе ────────────────────────────────────────────────────────── -->
+    <h2 id="about">Раздел «О программе»</h2>
+
+    <p>Содержит:</p>
+    <ul>
+      <li>Название и текущую версию программы.</li>
+      <li>Краткое описание назначения.</li>
+      <li>Контактный адрес электронной почты для сообщений об ошибках и предложений.</li>
+    </ul>
+
+    <hr class="section-sep" />
+
+    <!-- ── FAQ ───────────────────────────────────────────────────────────────── -->
+    <h2 id="faq">Частые вопросы</h2>
+
+    <h3>Программа сообщает «Ошибка соединения» при проверке</h3>
+    <p>Убедитесь, что:</p>
+    <ul>
+      <li>сервер PostgreSQL запущен и доступен по сети;</li>
+      <li>в <code>pg_hba.conf</code> разрешено подключение с вашего IP;</li>
+      <li>логин и пароль введены верно;</li>
+      <li>указана существующая база данных.</li>
+    </ul>
+
+    <h3>RTF-файл открывается, но текст отображается некорректно</h3>
+    <p>Файл создаётся в кодировке Windows-1251 (cp1251). Откройте его в Microsoft Word,
+       LibreOffice Writer или любом RTF-совместимом редакторе.
+       Если используете текстовый редактор — убедитесь, что он распознаёт кодировку.</p>
+
+    <h3>pg_dump завершается с ошибкой при экспорте</h3>
+    <ul>
+      <li>Проверьте, что <code>pg_dump</code> установлен и доступен в <code>PATH</code>.</li>
+      <li>Версия <code>pg_dump</code> должна совпадать с основной версией сервера PostgreSQL.</li>
+      <li>Пользователь должен иметь право читать схему: роль <code>pg_read_all_data</code> или явные права.</li>
+    </ul>
+
+    <h3>При применении скрипта 1 возникает ошибка «already exists»</h3>
+    <p>Схема или её объекты уже существуют в целевой базе. Либо удалите существующую схему вручную
+       (<code>DROP SCHEMA … CASCADE</code>), либо используйте новую пустую базу данных.</p>
+
+    <h3>Анализ комментариев занимает много времени</h3>
+    <p>Время анализа пропорционально количеству схем и объектов в базе данных.
+       Для баз с тысячами таблиц анализ может занимать несколько минут — следите за прогрессом
+       в строке статистики.</p>
+
+    <hr class="section-sep" />
+
+    <!-- ── Обратная связь ─────────────────────────────────────────────────────── -->
+    <h2 id="contact">Обратная связь</h2>
+
+    <p>Обнаружили ошибку или хотите предложить новую функцию?
+       Напишите на электронный адрес, указанный в разделе <a href="#about">«О программе»</a>.</p>
+
+    <p>При описании ошибки, пожалуйста, укажите:</p>
+    <ul>
+      <li>версию программы (из раздела «О программе»);</li>
+      <li>версию PostgreSQL (<code>SELECT version();</code>);</li>
+      <li>операционную систему;</li>
+      <li>точное описание шагов для воспроизведения ошибки;</li>
+      <li>текст сообщения об ошибке или содержимое лог-панели.</li>
+    </ul>
+
+    <p style="margin-top: 40px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); padding-top: 20px;">
+      DevOps DB Tool v0.1.0 &nbsp;·&nbsp; Документация актуальна для версии 0.1.0
+    </p>
+
+  </main>
+</div>
+
+<script>
+  // Highlight active sidebar link on scroll
+  const sections = document.querySelectorAll('[id]');
+  const links    = document.querySelectorAll('.sidebar nav a');
+
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const active = document.querySelector(`.sidebar nav a[href="#${e.target.id}"]`);
+        if (active) active.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-30% 0px -65% 0px' });
+
+  sections.forEach(s => observer.observe(s));
+</script>
+
+</body>
+</html>

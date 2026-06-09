@@ -7,6 +7,7 @@ class QSpinBox;
 class QTextEdit;
 class QPushButton;
 class QCheckBox;
+class QLabel;
 
 class SchemaExportDialog : public QWidget {
     Q_OBJECT
@@ -14,6 +15,7 @@ public:
     explicit SchemaExportDialog(QWidget* parent = nullptr);
 
 private slots:
+    void onTestConnection();
     void onBrowseDir();
     void onCopyDir();
     void onGenerateReport();
@@ -34,6 +36,9 @@ private:
     QLineEdit*   m_user     = nullptr;
     QLineEdit*   m_password = nullptr;
     QLineEdit*   m_schema   = nullptr;
+
+    QPushButton* m_testConnBtn      = nullptr;
+    QLabel*      m_connStatusLabel  = nullptr;
 
     QLineEdit*   m_outDir     = nullptr;
     QPushButton* m_browseBtn  = nullptr;

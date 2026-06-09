@@ -50,11 +50,19 @@ SchemaExportDialog::SchemaExportDialog(QWidget* parent)
     hpRow->addWidget(new QLabel("Порт:", this));
     hpRow->addWidget(m_port, 1);
 
+    m_testConnBtn     = new QPushButton("Проверить соединение", this);
+    m_connStatusLabel = new QLabel(this);
+    m_connStatusLabel->setTextFormat(Qt::RichText);
+    auto* testRow = new QHBoxLayout;
+    testRow->addWidget(m_testConnBtn);
+    testRow->addWidget(m_connStatusLabel, 1);
+
     connForm->addRow("Host:", hpRow);
     connForm->addRow("База данных:", m_database);
     connForm->addRow("Пользователь:", m_user);
     connForm->addRow("Пароль:", m_password);
     connForm->addRow("Схема:", m_schema);
+    connForm->addRow(testRow);
     root->addWidget(connGroup);
 
     // ── Директория вывода ─────────────────────────────────────────────────────
@@ -104,6 +112,7 @@ SchemaExportDialog::SchemaExportDialog(QWidget* parent)
     logLayout->addWidget(m_logArea);
     root->addWidget(logGroup, 1);
 
+    connect(m_testConnBtn,    &QPushButton::clicked, this, &SchemaExportDialog::onTestConnection);
     connect(m_browseBtn,      &QPushButton::clicked, this, &SchemaExportDialog::onBrowseDir);
     connect(m_copyDirBtn,     &QPushButton::clicked, this, &SchemaExportDialog::onCopyDir);
     connect(m_generateRptBtn, &QPushButton::clicked, this, &SchemaExportDialog::onGenerateReport);
@@ -380,6 +389,33 @@ QString SchemaExportDialog::buildRtfReport(const ConnectionConfig& cfg, bool inc
 }
 
 // ── Slots ─────────────────────────────────────────────────────────────────────
+
+void SchemaExportDialog::onTestConnection() {
+    const auto cfg = readDbConfig();
+    m_connStatusLabel->setText("Проверка…");
+    m_testConnBtn->setEnabled(false);
+    QApplication::processEvents();
+
+    QProcess psql;
+    psql.setEnvironment(QProcess::systemEnvironment()
+        << QString("PGPASSWORD=%1").arg(cfg.password));
+    psql.start("psql", {
+        "-h", cfg.host, "-p", QString::number(cfg.port),
+        "-U", cfg.user, "-d", cfg.database,
+        "-c", "SELECT 1", "-t", "-A"
+    });
+    psql.waitForFinished(10000);
+    m_testConnBtn->setEnabled(true);
+
+    if (psql.exitCode() == 0) {
+        m_connStatusLabel->setText("<span style='color:green'>✔ Соединение успешно</span>");
+    } else {
+        const QString err = QString::fromUtf8(psql.readAllStandardError()).trimmed();
+        m_connStatusLabel->setText(
+            QString("<span style='color:red'>✗ %1</span>")
+            .arg(err.isEmpty() ? "Ошибка соединения" : err.toHtmlEscaped()));
+    }
+}
 
 void SchemaExportDialog::onBrowseDir() {
     const QString dir = QFileDialog::getExistingDirectory(
