@@ -14,9 +14,11 @@ add_executable(devops_db_tool
     app/main.cpp
     src/schema_export_dialog.cpp
     src/schema_backup_dialog.cpp
+    src/schema_analysis_dialog.cpp
     include/import_tool/connection_config.h
     include/import_tool/schema_export_dialog.h
     include/import_tool/schema_backup_dialog.h
+    include/import_tool/schema_analysis_dialog.h
 )
 
 target_include_directories(devops_db_tool PRIVATE

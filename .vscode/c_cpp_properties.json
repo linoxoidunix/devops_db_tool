@@ -1,0 +1,20 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/include",
+                "/usr/include/qt5",
+                "/usr/include/qt5/QtCore",
+                "/usr/include/qt5/QtWidgets",
+                "/usr/include/qt5/QtGui",
+                "/usr/include/qt5/QtSql"
+            ],
+            "defines": ["QT_CORE_LIB", "QT_WIDGETS_LIB", "QT_SQL_LIB"],
+            "compileCommands": "${workspaceFolder}/compile_commands.json",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+    ],
+    "version": 4
+}
