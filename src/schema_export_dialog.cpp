@@ -8,7 +8,6 @@
 #include <QSpinBox>
 #include <QTextEdit>
 #include <QPushButton>
-#include <QCheckBox>
 #include <QLabel>
 #include <QFileDialog>
 #include <QMessageBox>
@@ -22,6 +21,7 @@
 #include <QSettings>
 #include <QMap>
 #include <QVector>
+#include <QRegularExpression>
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -77,11 +77,12 @@ SchemaExportDialog::SchemaExportDialog(QWidget* parent)
     root->addWidget(outGroup);
 
     // ── Опции ─────────────────────────────────────────────────────────────────
-    auto* optGroup  = new QGroupBox("Опции отчёта", this);
-    auto* optLayout = new QVBoxLayout(optGroup);
-    m_includeFkCheck = new QCheckBox("Включить описание Foreign Key в колонках", this);
-    m_includeFkCheck->setChecked(false);
-    optLayout->addWidget(m_includeFkCheck);
+    auto* optGroup = new QGroupBox("Опции отчёта", this);
+    auto* optForm  = new QFormLayout(optGroup);
+    m_schemaNumber = new QSpinBox(this);
+    m_schemaNumber->setRange(0, 1000000000);
+    m_schemaNumber->setValue(1);
+    optForm->addRow("Номер схемы в документе:", m_schemaNumber);
     root->addWidget(optGroup);
 
     // ── Кнопка генерации ─────────────────────────────────────────────────────
@@ -132,6 +133,7 @@ void SchemaExportDialog::loadSettings() {
     m_user->setText(s.value("user", "postgres").toString());
     m_schema->setText(s.value("schema", "public").toString());
     m_outDir->setText(s.value("outDir", QDir::homePath()).toString());
+    m_schemaNumber->setValue(s.value("schemaNumber", 1).toInt());
     s.endGroup();
 }
 
@@ -144,6 +146,7 @@ void SchemaExportDialog::saveSettings() {
     s.setValue("user",     m_user->text());
     s.setValue("schema",   m_schema->text());
     s.setValue("outDir",   m_outDir->text());
+    s.setValue("schemaNumber", m_schemaNumber->value());
     s.endGroup();
 }
 
@@ -208,16 +211,30 @@ static QString rtfEscape(const QString& s) {
     return r;
 }
 
-static QString rtfCell(const QString& text, bool bold = false) {
-    QString s = bold
-        ? "\\pard\\intbl\\b " + rtfEscape(text) + "\\b0\\cell "
-        : "\\pard\\intbl " + rtfEscape(text) + "\\cell ";
-    return s;
+// Любое слово с латинскими буквами оформляется курсивом
+static QString rtfItalicizeLatin(const QString& s) {
+    static const QRegularExpression latin("[A-Za-z]");
+    QString r;
+    const QStringList tokens = s.split(' ');
+    for (int i = 0; i < tokens.size(); ++i) {
+        if (i) r += ' ';
+        if (latin.match(tokens[i]).hasMatch())
+            r += "{\\i " + rtfEscape(tokens[i]) + "}";
+        else
+            r += rtfEscape(tokens[i]);
+    }
+    return r;
+}
+
+// Ячейка с уже готовым RTF-содержимым
+static QString rtfCellRaw(const QString& rtfContent, bool center = false) {
+    return QString("\\pard\\intbl%1 %2\\cell ")
+        .arg(center ? "\\qc" : "", rtfContent);
 }
 
 // ── RTF report ────────────────────────────────────────────────────────────────
 
-QString SchemaExportDialog::buildRtfReport(const ConnectionConfig& cfg, bool includeFk) {
+QString SchemaExportDialog::buildRtfReport(const ConnectionConfig& cfg, int schemaNumber) {
     const QString schema = cfg.schema;
 
     // Check connectivity
@@ -259,29 +276,27 @@ QString SchemaExportDialog::buildRtfReport(const ConnectionConfig& cfg, bool inc
     log(QString("  Таблиц найдено: %1").arg(tables.size()));
 
     // Column widths in twips (1 inch = 1440 twips)
-    // 4 or 5 columns in A4 landscape (about 12240 usable twips)
-    const int colW1 = 2400; // field name
-    const int colW2 = 3600; // description (RU)
-    const int colW3 = 1800; // data type
-    const int colW4 = 2400; // FK (optional)
-    const int totalW3 = colW1 + colW2 + colW3;
-    const int totalW4 = colW1 + colW2 + colW3 + colW4;
+    // 4 columns: Поле | Тип | Описание | Ограничения
+    const int colW1 = 2400; // Поле
+    const int colW2 = 2400; // Тип
+    const int colW3 = 4200; // Описание
+    const int colW4 = 2600; // Ограничения
 
-    auto makeRowDef = [&](bool fk) -> QString {
-        QString s = "\\trowd\\trgaph108\\trleft0"
-                    "\\trbrdrb\\brdrs\\brdrw10"
-                    "\\trbrdrr\\brdrs\\brdrw10"
-                    "\\trbrdrl\\brdrs\\brdrw10"
-                    "\\trbrdrt\\brdrs\\brdrw10 ";
+    auto makeRowDef = [&]() -> QString {
+        // одинарные границы у каждой ячейки, чтобы сетка была видна всегда
+        const QString cellBorders =
+            "\\clbrdrt\\brdrs\\brdrw10"
+            "\\clbrdrb\\brdrs\\brdrw10"
+            "\\clbrdrl\\brdrs\\brdrw10"
+            "\\clbrdrr\\brdrs\\brdrw10";
+        QString s = "\\trowd\\trgaph108\\trleft0 ";
         int x = colW1;
-        s += QString("\\cellx%1 ").arg(x); x += colW2;
-        s += QString("\\cellx%1 ").arg(x); x += colW3;
-        s += QString("\\cellx%1 ").arg(x);
-        if (fk) { x += colW4; s += QString("\\cellx%1 ").arg(x); }
+        s += cellBorders + QString("\\cellx%1 ").arg(x); x += colW2;
+        s += cellBorders + QString("\\cellx%1 ").arg(x); x += colW3;
+        s += cellBorders + QString("\\cellx%1 ").arg(x); x += colW4;
+        s += cellBorders + QString("\\cellx%1 ").arg(x);
         return s;
     };
-    Q_UNUSED(totalW3)
-    Q_UNUSED(totalW4)
 
     // Build RTF
     QString rtf;
@@ -291,27 +306,34 @@ QString SchemaExportDialog::buildRtfReport(const ConnectionConfig& cfg, bool inc
            "{\\fonttbl{\\f0\\froman\\fcharset204 Times New Roman;}"
            "{\\f1\\fmodern\\fcharset204 Courier New;}}\n"
            "{\\colortbl ;\\red0\\green0\\blue0;\\red100\\green100\\blue100;}\n"
-           "\\widowctrl\\hyphauto\n"
+           "\\widowctrl\n" // без автопереносов, чтобы идентификаторы не рвались дефисом
+
            "\\paperw16838\\paperh11906\\lndscpsxn\n" // A4 landscape
            "\\margl1440\\margr1440\\margt1440\\margb1440\n"
            "\\f0\\fs24\n\n";
 
-    // Schema header
+    // Schema header: «N. Схема «имя_схемы» – комментарий»
     rtf += "{\\pard\\sb200\\sa100\\b\\fs28 "
-           + rtfEscape(QString("Схема: %1").arg(schema))
-           + "\\b0\\par}\n";
+           + rtfEscape(QString("%1. Схема «").arg(schemaNumber))
+           + "{\\i " + rtfEscape(schema) + "}"
+           + rtfEscape("»");
     if (!schemaComment.isEmpty())
-        rtf += "{\\pard\\sa100\\i " + rtfEscape(schemaComment) + "\\i0\\par}\n";
+        rtf += rtfEscape(" – ") + rtfItalicizeLatin(schemaComment);
+    rtf += "\\b0\\par}\n";
 
+    int tableIndex = 0;
     for (const auto& tbl : tables) {
+        ++tableIndex;
         log(QString("  Обработка: %1").arg(tbl.name));
 
-        // Table heading
-        rtf += "\n{\\pard\\sb200\\sa80\\b\\fs26 "
-               + rtfEscape(QString("Таблица: %1").arg(tbl.name))
-               + "\\b0\\par}\n";
+        // Заголовок: «Таблица N.K – схема.таблица – комментарий»
+        rtf += "\n{\\pard\\sb200\\sa80\\b "
+               + rtfEscape(QString("Таблица %1.%2").arg(schemaNumber).arg(tableIndex))
+               + rtfEscape(" – ")
+               + "{\\i " + rtfEscape(QString("%1.%2").arg(schema, tbl.name)) + "}";
         if (!tbl.comment.isEmpty())
-            rtf += "{\\pard\\sa80\\i " + rtfEscape(tbl.comment) + "\\i0\\par}\n";
+            rtf += rtfEscape(" – ") + rtfItalicizeLatin(tbl.comment);
+        rtf += "\\b0\\par}\n";
 
         // Columns
         struct ColInfo { QString name, type, comment; };
@@ -321,12 +343,6 @@ QString SchemaExportDialog::buildRtfReport(const ConnectionConfig& cfg, bool inc
                 "SELECT c.column_name,"
                 "CASE"
                 " WHEN c.data_type='USER-DEFINED' THEN c.udt_name"
-                " WHEN c.data_type='character varying'"
-                "      AND c.character_maximum_length IS NOT NULL"
-                "   THEN 'varchar('||c.character_maximum_length||')'"
-                " WHEN c.data_type='timestamp without time zone' THEN 'timestamp'"
-                " WHEN c.data_type='timestamp with time zone' THEN 'timestamptz'"
-                " WHEN c.data_type='double precision' THEN 'float8'"
                 " ELSE c.data_type END,"
                 "COALESCE(REPLACE(REPLACE(pgd.description,E'\\n',' '),chr(31),' '),'') "
                 "FROM information_schema.columns c "
@@ -344,12 +360,28 @@ QString SchemaExportDialog::buildRtfReport(const ConnectionConfig& cfg, bool inc
             }
         }
 
-        // FK map
+        // Primary key columns
+        QStringList pkCols;
+        {
+            const auto rows = runQuery(cfg, QString(
+                "SELECT kcu.column_name "
+                "FROM information_schema.table_constraints tc "
+                "JOIN information_schema.key_column_usage kcu"
+                "  ON kcu.constraint_name=tc.constraint_name"
+                "  AND kcu.table_schema=tc.table_schema "
+                "WHERE tc.table_schema='%1' AND tc.table_name='%2'"
+                "  AND tc.constraint_type='PRIMARY KEY' "
+                "ORDER BY kcu.ordinal_position").arg(schema, tbl.name));
+            for (const QString& row : rows)
+                pkCols << row.trimmed();
+        }
+
+        // Foreign keys: колонка → «схема.таблица (колонка)», на которую она ссылается
         QMap<QString, QString> fkMap;
-        if (includeFk) {
+        {
             const auto rows = runQuery(cfg, QString(
                 "SELECT kcu.column_name,"
-                "ccu.table_schema||'.'||ccu.table_name||'('||ccu.column_name||')' "
+                "ccu.table_schema,ccu.table_name,ccu.column_name "
                 "FROM information_schema.key_column_usage kcu "
                 "JOIN information_schema.referential_constraints rc"
                 "  ON rc.constraint_name=kcu.constraint_name"
@@ -360,25 +392,44 @@ QString SchemaExportDialog::buildRtfReport(const ConnectionConfig& cfg, bool inc
                 .arg(schema, tbl.name));
             for (const QString& row : rows) {
                 const QStringList p = row.split('\x1f');
-                if (p.size() >= 2) fkMap[p[0].trimmed()] = p[1].trimmed();
+                // «схема.» / «таблица» / «(колонка)» — каждая часть на своей строке,
+                // чтобы длинные идентификаторы не переносились по дефису
+                if (p.size() >= 4)
+                    fkMap[p[0].trimmed()] = QString("%1.\n%2\n(%3)")
+                        .arg(p[1].trimmed(), p[2].trimmed(), p[3].trimmed());
             }
         }
 
-        // Header row
-        rtf += makeRowDef(includeFk);
-        rtf += rtfCell("Наименование поля", true);
-        rtf += rtfCell("Описание (рус.)",   true);
-        rtf += rtfCell("Тип данных",         true);
-        if (includeFk) rtf += rtfCell("Foreign Key", true);
+        // Header row: Поле | Тип | Описание | Ограничения
+        rtf += makeRowDef();
+        rtf += rtfCellRaw(rtfEscape("Поле"),        true);
+        rtf += rtfCellRaw(rtfEscape("Тип"),         true);
+        rtf += rtfCellRaw(rtfEscape("Описание"),    true);
+        rtf += rtfCellRaw(rtfEscape("Ограничения"), true);
         rtf += "\\row\n";
 
         // Data rows
         for (const auto& col : cols) {
-            rtf += makeRowDef(includeFk);
-            rtf += rtfCell(col.name);
-            rtf += rtfCell(col.comment);
-            rtf += rtfCell(col.type);
-            if (includeFk) rtf += rtfCell(fkMap.value(col.name));
+            QStringList constraints;
+            if (pkCols.contains(col.name))
+                constraints << QString("PRIMARY KEY (%1)").arg(col.name);
+            if (fkMap.contains(col.name))
+                constraints << QString("FOREIGN KEY\n%1").arg(fkMap.value(col.name));
+
+            rtf += makeRowDef();
+            rtf += rtfCellRaw("{\\i " + rtfEscape(col.name) + "}");
+            rtf += rtfCellRaw("{\\i " + rtfEscape(col.type) + "}");
+            rtf += rtfCellRaw(rtfItalicizeLatin(col.comment));
+            QString consRtf;
+            for (int i = 0; i < constraints.size(); ++i) {
+                if (i) consRtf += "\\line ";
+                // внутренний перенос (FK: цель на следующей строке)
+                const QStringList lines = constraints[i].split('\n');
+                QStringList esc;
+                for (const QString& ln : lines) esc << rtfEscape(ln);
+                consRtf += "{\\i " + esc.join("\\line ") + "}";
+            }
+            rtf += rtfCellRaw(consRtf);
             rtf += "\\row\n";
         }
         rtf += "\\pard\\par\n";
@@ -460,7 +511,7 @@ void SchemaExportDialog::onGenerateReport() {
     saveSettings();
 
     m_generateRptBtn->setEnabled(false);
-    const QString rtf = buildRtfReport(cfg, m_includeFkCheck->isChecked());
+    const QString rtf = buildRtfReport(cfg, m_schemaNumber->value());
     m_generateRptBtn->setEnabled(true);
 
     if (rtf.isEmpty()) return;

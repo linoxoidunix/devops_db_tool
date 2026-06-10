@@ -6,7 +6,6 @@ class QLineEdit;
 class QSpinBox;
 class QTextEdit;
 class QPushButton;
-class QCheckBox;
 class QLabel;
 
 class SchemaExportDialog : public QWidget {
@@ -28,7 +27,7 @@ private:
     void log(const QString& msg);
     void setLastFile(const QString& path);
     QStringList runQuery(const ConnectionConfig& cfg, const QString& sql);
-    QString buildRtfReport(const ConnectionConfig& cfg, bool includeFk);
+    QString buildRtfReport(const ConnectionConfig& cfg, int schemaNumber);
 
     QLineEdit*   m_host     = nullptr;
     QSpinBox*    m_port     = nullptr;
@@ -47,7 +46,7 @@ private:
     QLineEdit*   m_lastFilePath = nullptr;
     QPushButton* m_copyFileBtn  = nullptr;
 
-    QCheckBox*   m_includeFkCheck = nullptr;
+    QSpinBox*    m_schemaNumber = nullptr;
 
     QPushButton* m_generateRptBtn = nullptr;
 
